@@ -55,8 +55,8 @@ TLX_EPS_REL = np.array([
 ])
 
 # Evolution parameters
-POP_SIZE = 3
-N_GENERATIONS = 2
+POP_SIZE = 30
+N_GENERATIONS = 10
 SEED = 42
 
 # # of YAMLs to keep
