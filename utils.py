@@ -20,8 +20,8 @@ def start_middle_container():
         "bash", "-c", f"cp {par.CASE_STUDIES_DIR} {par.DESTINATION_DIR} \
         && cp {par.MIDDLE_PATH} {par.DESTINATION_DIR} \
         && cp {par.TESTCASE_PATH} {par.DESTINATION_DIR} \
-        export PYTHONPATH={par.DESTINATION_DIR}:$PYTHONPATH \
-        python3 {par.DESTINATION_DIR}/{par.MIDDLE_PY}"
+        && export PYTHONPATH={par.DESTINATION_DIR}:$PYTHONPATH \
+        && python3 {par.DESTINATION_DIR}/{par.MIDDLE_PY}"
     ]
     print("[+] Starting middle.py in Docker container...")
     check_call(cmd)

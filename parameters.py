@@ -75,3 +75,5 @@ BASE_YAML = "./case_studies/mission2.yaml"
 TIMEOUT = 20 * 60
 COOL = 5
 POLL = 60
+
+MAX_WORKERS = 1
