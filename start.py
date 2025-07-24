@@ -1,171 +1,24 @@
-from time import sleep, time
+import parameters as par
+import utils
 import os
-import uuid
-import json
-import subprocess
 import numpy as np
-from fastdtw import fastdtw
 import atexit
 import shutil
-from scipy.spatial.distance import euclidean
-from shapely.geometry import Polygon
+# import pymap3d as pm
+from shapely.geometry import Polygon#, LineString
 from shapely import affinity
+# from shapely.ops import substring
 from pymoo.core.problem import Problem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from pymoo.core.survival import Survival
 from pymoo.core.callback import Callback
-
-
-# Paths
-OUTPUT_DIR = "/mnt/c/UAV/generated_genomes"
-RESULTS_DIR = "/mnt/c/UAV/results"
-YAML_DIR = "/mnt/c/UAV/generated_tests"
-FINAL_DIR = "./final_tests"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(FINAL_DIR, exist_ok=True)
-
-# SBFT constraints
-NUM_OBS = 3
-VARS_PER_OBS = 6
-TOTAL_VARS = NUM_OBS * VARS_PER_OBS
-XL = np.array([-40, 10, 2, 2, 10, 0] * NUM_OBS)
-XU = np.array([30,  40, 20, 20, 25, 90] * NUM_OBS)
-
-# MAX penalties value
-INVALID = 1e6
-
-# Novelty archive parameters
-ARCHIVE_MAX = 750            # cap on stored trajectories
-NOVELTY_DOWNSAMPLE_K = 100   # samples for DTW basis
-
-# Tolerant Lexicographic parameters
-# Absolute tolerances
-TLX_EPS_ABS = np.array([
-    2,      # distance
-    0.5,    # novelty
-    1.0,    # duration
-])
-# Relative tolerances
-TLX_EPS_REL = np.array([
-    0.0,    # distance
-    0.0,    # novelty
-    0.0,    # duration
-])
-
-# Evolution parameters
-POP_SIZE = 30
-N_GENERATIONS = 10
-SEED = 42
-
-# # of YAMLs to keep
-TOP_K = 15
-
-# DOCKER
-DOCKER_IMAGE    = "5ff51322acba"        # Aerialist image ID / tag
-CONTAINER_NAME  = "aerialist-middle"
-SHARED_HOST_DIR = "/mnt/c/UAV"
-SHARED_CONT_DIR = "/tests"
-COPY_SCRIPT     = "copy.sh"
-
-def start_middle_container():
-    """Launch docker in detached mode"""
-    cmd = [
-        "docker", "run", "--rm", "-d",
-        "--name",     CONTAINER_NAME,
-        "--gpus",     "all",
-        "-v",         f"{SHARED_HOST_DIR}:{SHARED_CONT_DIR}",
-        "-it",        DOCKER_IMAGE,
-        "bash", "-c", f"{SHARED_CONT_DIR}/{COPY_SCRIPT}"
-    ]
-    print("[+] Starting middle.py in Docker container...")
-    subprocess.check_call(cmd)
-    print(f"[+] Container '{CONTAINER_NAME}' started.")
-
-def stop_middle_container():
-    print(f"[+] Stopping container '{CONTAINER_NAME}'...")
-    subprocess.call(["docker", "stop", CONTAINER_NAME])
-    print("[+] Container stopped.")
-
-def genome_to_data_dict(genome, name_prefix="test"):
-    name = f"{name_prefix}_{uuid.uuid4().hex[:8]}"
-    obstacles = []
-
-    for i in range(NUM_OBS):
-        base = i * VARS_PER_OBS
-        x, y = genome[base], genome[base + 1]
-        l, w, h = genome[base + 2], genome[base + 3], genome[base + 4]
-        r = genome[base + 5]
-
-        # Ensure h > 10 and round values
-        if h >= 10:
-            obstacle = {
-                "position": [round(float(x), 2), round(float(y), 2), 0.0],
-                "size": [round(float(l), 2), round(float(w), 2), round(float(h), 2)],
-                "rotation": round(float(r % 360), 2)
-            }
-            obstacles.append(obstacle)
-
-
-    return {"name": name, "obstacles": obstacles}, name
-
-def save_genome_data(data_dict, name):
-    path = os.path.join(OUTPUT_DIR, f"{name}.json")
-    with open(path, 'w') as f:
-        json.dump(data_dict, f, indent=2)
-    return path
-
-def wait_for_all(names, results_dir, per_file_timeout=900, poll=60):
-    pending = set(names)
-    collected = {}
-    deadline = time() + per_file_timeout * len(names)
-
-    while pending and time() < deadline:
-        ready = []
-        for n in list(pending):
-            path = os.path.join(results_dir, f"{n}_result.json")
-            if os.path.exists(path):
-                with open(path) as fp:
-                    collected[n] = json.load(fp)
-                ready.append(n)
-        pending.difference_update(ready)
-
-        if pending:
-            sleep(poll)
-
-    for n in pending:
-        collected[n] = None
-    return collected
-
-def downsample(traj, k = NOVELTY_DOWNSAMPLE_K):
-    if len(traj) <= k:
-        return traj
-
-    idx = np.linspace(0, len(traj) - 1, k, dtype=int)
-    return [traj[i] for i in idx]
-
-def traj_xy(traj):
-    """Strip time & z -> list[(x,y)]."""
-    return [(p[1], p[2]) for p in traj]
-
-def dtw_distance_xy(traj_a, traj_b):
-    """FastDTW between two XY poly-lines -> scalar distance."""
-    a = np.asarray(traj_a, dtype=float)
-    b = np.asarray(traj_b, dtype=float)
-    distance, _ = fastdtw(a, b, dist=euclidean)
-    return float(distance)
-
-def dtw_novelty(traj, archive):
-    """Min DTW distance between traj and any in archive; large -> novel."""
-    if not archive:
-        return 0
-    return min(dtw_distance_xy(traj, ref) for ref in archive)
-
+# from pymoo.core.sampling import Sampling
 
 class UAVTestGenomeProblem(Problem):
     def __init__(self):
-        super().__init__(n_var=TOTAL_VARS, n_obj=3, n_constr=0, xl=XL, xu=XU)
+        super().__init__(n_var=par.TOTAL_VARS, n_obj=3, n_constr=0, xl=par.XL, xu=par.XU)
         self.archive = []
         self.gen_idx = 0
         self.records  = []
@@ -188,7 +41,7 @@ class UAVTestGenomeProblem(Problem):
         # generate genomes / basic checks
         for genome in X:
             genome = genome.astype(float).tolist()
-            data_dict, name = genome_to_data_dict(genome)
+            data_dict, name = utils.genome_to_data_dict(genome)
             obstacles = data_dict["obstacles"]
             names_in_order.append(name)
 
@@ -206,42 +59,41 @@ class UAVTestGenomeProblem(Problem):
                 penalties.append(name)          # remember to penalise later
                 continue
 
-            save_genome_data(data_dict, name)
+            utils.save_genome_data(data_dict, name)
             pending_names.append(name)
 
         # wait until all sims finish
-        results = wait_for_all(pending_names, RESULTS_DIR)
+        results = utils.wait_for_all(pending_names, par.RESULTS_DIR)
 
         # build fitness array in the same order
         fitness_rows = []
         for vec, name in zip(X, names_in_order):
             vec = vec.astype(float)
             if name in penalties:
-                fitness_rows.append([INVALID, INVALID, INVALID])
+                fitness_rows.append([par.INVALID, par.INVALID, par.INVALID])
                 continue
 
             res = results.get(name)
             if res and res["min_dist"] is not None:
 
-                # f1 = res["min_dist"] if self.gen_idx < 3 else res["min_dist"] * 3
-                # f1 = np.exp(2 * f1)
-                dist = float(res["min_dist"]) * 100     # larger diff -> larger dist cut
+                # larger diff -> larger dist cut, temp for 0 dist
+                dist = float(res["min_dist"]) * 100 if float(res["min_dist"]) != 0 else 0.1
                 dur = float(res["duration"]) / 1e6      # form nanosecond to second
 
                 # DTW diversity
-                track_xy = traj_xy(downsample(res["trajectory"]))
-                nov = dtw_novelty(track_xy, archive_traj)
+                track_xy = utils.traj_xy(utils.downsample(res["trajectory"]))
+                nov = utils.dtw_novelty(track_xy, archive_traj)
                 # persist for next generations
                 archive_traj.append(track_xy)
-                if len(archive_traj) > ARCHIVE_MAX:
+                if len(archive_traj) > par.ARCHIVE_MAX:
                     archive_traj.pop(0) # FIFO
 
                 fitness_rows.append([dist, -nov, dur])
-                yaml_path = os.path.join(YAML_DIR, f"{name}.yaml")
+                yaml_path = os.path.join(par.YAML_DIR, f"{name}.yaml")
                 self.records.append((dist, -nov, dur, name, yaml_path))
 
             else:
-                fitness_rows.append([INVALID, INVALID, INVALID])
+                fitness_rows.append([par.INVALID, par.INVALID, par.INVALID])
 
 
         self.archive = archive_traj
@@ -298,6 +150,40 @@ class TolerantLexicoSurvival(Survival):
 
         return pop[order[:n_survive]]
 
+"""
+class PathSeedSampling(Sampling):
+
+    def _do(self, problem, n_samples, **kwargs):
+        ROUTE = load_route(PLAN_FILE)
+        rng = np.random.default_rng(SEED)
+
+        X = np.empty((n_samples, problem.n_var))
+        for k in range(n_samples):
+            genes = []
+            for obs in range(NUM_OBS):
+                # pick a random point along the nominal track
+                s = rng.random()
+                base = ROUTE.interpolate(s, normalized=True)
+
+                # scatter inside a circle of pad-radius
+                angle = rng.uniform(0, 2*np.pi)
+                radius = rng.uniform(0, PAD_M)
+                dx = radius * np.cos(angle)
+                dy = radius * np.sin(angle)
+                x = base.x + dx
+                y = base.y + dy
+
+                # sample size / rotation within bounds
+                l = rng.uniform(problem.xl[2], problem.xu[2])
+                w = rng.uniform(problem.xl[3], problem.xu[3])
+                h = rng.uniform(max(10., problem.xl[4]), problem.xu[4])
+                r = rng.uniform(problem.xl[5], problem.xu[5])
+                genes.extend([x, y, l, w, h, r])
+
+            X[k] = genes
+        return X
+"""
+
 class Diagnostics(Callback):
     def __init__(self, eps_abs: np.ndarray):
         super().__init__()
@@ -334,9 +220,9 @@ def best_tests(records):
     def rank_key(rec):
         dist, nov_neg, dur, *_ = rec
         return (
-            np.floor(dist / TLX_EPS_ABS[0]),
-            np.floor(nov_neg / TLX_EPS_ABS[1]),
-            np.floor(dur / TLX_EPS_ABS[2]),
+            np.floor(dist / par.TLX_EPS_ABS[0]),
+            np.floor(nov_neg / par.TLX_EPS_ABS[1]),
+            np.floor(dur / par.TLX_EPS_ABS[2]),
         )
 
     unique = {}
@@ -345,33 +231,35 @@ def best_tests(records):
         if name not in unique or rank_key(rec) < rank_key(unique[name]):
             unique[name] = rec
 
-    best = sorted(unique.values(), key=rank_key)[:TOP_K]
+    best = sorted(unique.values(), key=rank_key)[:par.TOP_K]
 
     for dist, nov_neg, dur, name, src in best:
-        dst = os.path.join(FINAL_DIR, os.path.basename(src))
+        dst = os.path.join(par.FINAL_DIR, os.path.basename(src))
         shutil.copy2(src, dst)
         print(f"[+] kept {name}.yaml  dist={dist/100:.3f}  nov={-nov_neg:.2f}  dur={dur:.1f}s")
 
-    print(f"[+] Copied {len(best)} YAML tests to {FINAL_DIR}")
+    print(f"[+] Copied {len(best)} YAML tests to {par.FINAL_DIR}")
 
 if __name__ == "__main__":
+    os.makedirs(par.OUTPUT_DIR, exist_ok=True)
+    os.makedirs(par.FINAL_DIR, exist_ok=True)
     # Start the Aerialist-side as a daemon
-    start_middle_container()
+    utils.start_middle_container()
     # Ensure container stops atExit
-    atexit.register(stop_middle_container)
+    atexit.register(utils.stop_middle_container)
 
     problem = UAVTestGenomeProblem()
-    survival = TolerantLexicoSurvival(TLX_EPS_ABS, TLX_EPS_REL)
-    diagnostics = Diagnostics(TLX_EPS_ABS)
-    algorithm = NSGA2(pop_size=POP_SIZE, survival=survival, eliminate_duplicates=True)
+    survival = TolerantLexicoSurvival(par.TLX_EPS_ABS, par.TLX_EPS_REL)
+    diagnostics = Diagnostics(par.TLX_EPS_ABS)
+    algorithm = NSGA2(pop_size=par.POP_SIZE, survival=survival, eliminate_duplicates=True, sampling=PathSeedSampling())
     algorithm.survival = survival
-    termination = get_termination("n_gen", N_GENERATIONS)
+    termination = get_termination("n_gen", par.N_GENERATIONS)
 
     result = minimize(
         problem,
         algorithm,
         termination,
-        seed=SEED,
+        seed=par.SEED,
         save_history=True,
         verbose=False,
         callback=diagnostics,

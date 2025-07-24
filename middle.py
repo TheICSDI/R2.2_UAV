@@ -5,6 +5,8 @@ import json
 import uuid
 import multiprocessing as mp
 from typing import List
+import logging
+import parameters as par
 
 os.environ["AGENT"] = "local"
 
@@ -12,13 +14,12 @@ from aerialist.px4.drone_test import DroneTest
 from aerialist.px4.obstacle import Obstacle
 from testcase import TestCase
 
-# Shared folder locations
-INPUT_DIR = "/tests/generated_genomes"
-YAML_DIR = "/tests/generated_tests"
-RESULTS_DIR = "/tests/results"
-BASE_YAML = "./case_studies/mission2.yaml"
+# Logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-TIMEOUT_SEC = 900
 
 def build_obstacles(raw) -> List[Obstacle]:
     obs = []
@@ -40,7 +41,7 @@ def build_obstacles(raw) -> List[Obstacle]:
     return obs
 
 def error_json(name, obstacles) -> None:
-    error_path = os.path.join(RESULTS_DIR, f"{name}_result.json")
+    error_path = os.path.join(par.RESULTS_DIR, f"{name}_result.json")
     with open(error_path, "w") as fp:
         json.dump({
             "name": name,
@@ -64,14 +65,14 @@ def run_test_in_process(tc, name, obstacles) -> None:
             "trajectory": [[p.timestamp, p.x, p.y, p.z] for p in trajectory.positions]
         }
 
-        result_path = os.path.join(RESULTS_DIR, f"{name}_result.json")
+        result_path = os.path.join(par.RESULTS_DIR, f"{name}_result.json")
         with open(result_path, "w") as fp:
             json.dump(result, fp, indent=2)
 
-        print(f"[+] {name} - YAML saved and test executed.")
+        logging.info(f"[+] {name} - YAML saved and test executed.")
 
     except Exception as e:
-        print(f"[-] {name} - Failed during test execution: {e}")
+        logging.error(f"[-] {name} - Failed during test execution: {e}")
         error_json(name, obstacles)
 
 def convert_and_run(jfile) -> None:
@@ -82,29 +83,29 @@ def convert_and_run(jfile) -> None:
     obstacles = build_obstacles(data["obstacles"])
 
     # Load base case study (with mission plan)
-    base = DroneTest.from_yaml(BASE_YAML)
+    base = DroneTest.from_yaml(par.BASE_YAML)
     # Construct the test case using the SBFT format
     tc = TestCase(base, obstacles)
 
-    out_path = os.path.join(YAML_DIR, f"{name}.yaml")
+    out_path = os.path.join(par.YAML_DIR, f"{name}.yaml")
     tc.save_yaml(out_path)
 
+    sleep(par.COOL)
     p = mp.Process(target=run_test_in_process, args=(tc, name, obstacles))
     p.start()
-    p.join(TIMEOUT_SEC)
+    p.join(par.TIMEOUT)
 
     if p.is_alive():
-        print(f"[-] {name} - Timeout. Killing test process.")
+        logging.info(f"[-] {name} - Timeout. Killing test process.")
         p.terminate()
         p.join()
         error_json(name, obstacles)
 
 def process_forever():
-    POLL_SEC   = 60
-    print(f"[+] middle.py daemon — polling every {POLL_SEC}s")
+    logging.info(f"[+] middle.py daemon — polling every {par.POLL}s")
     while True:
         # grab every *.json currently present
-        for path in glob.glob(f"{INPUT_DIR}/*.json"):
+        for path in glob.glob(f"{par.INPUT_DIR}/*.json"):
             try:
                 convert_and_run(path)
             finally:
@@ -112,10 +113,12 @@ def process_forever():
                 try:
                     os.remove(path)
                 except OSError as e:
-                    print(f"[-] Failed during delation: {e}")
-        sleep(POLL_SEC)
+                    logging.error(f"[-] Failed during delation: {e}")
+        sleep(par.POLL)
 
 if __name__ == "__main__":
-    os.makedirs(YAML_DIR,    exist_ok=True)
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(par.YAML_DIR, exist_ok=True)
+    os.makedirs(par.RESULTS_DIR, exist_ok=True)
+    # necessary folder if we mount the shered folder into /src/aerialist/results
+    os.makedirs("./results/logs", exist_ok=True)
     process_forever()
