@@ -26,6 +26,7 @@ logging.basicConfig(
 )
 
 def build_obstacles(raw) -> List[Obstacle]:
+    """Build the Obstacle object from the raw data in the json"""
     obs = []
     for ob in raw:
         size = Obstacle.Size(
@@ -36,7 +37,7 @@ def build_obstacles(raw) -> List[Obstacle]:
 
         position = Obstacle.Position(
             x=ob["position"][0],
-y=ob["position"][1],
+            y=ob["position"][1],
             z=ob["position"][2],
             r=ob["rotation"],
         )
@@ -45,6 +46,7 @@ y=ob["position"][1],
     return obs
 
 def error_json(name, obstacles) -> None:
+    """Build the error json"""
     error_path = os.path.join(par.RESULTS_DIR, f"{name}_result.json")
     with open(error_path, "w") as fp:
         json.dump({
@@ -56,6 +58,7 @@ def error_json(name, obstacles) -> None:
         }, fp, indent=2)
 
 def run_test_in_process(tc, name, obstacles) -> None:
+    """Execute the TestCase (tc) and write in json the significant result"""
     try:
         trajectory = tc.execute()
         distances = tc.get_distances()
@@ -80,6 +83,7 @@ def run_test_in_process(tc, name, obstacles) -> None:
         error_json(name, obstacles)
 
 def convert_and_run(jfile, port) -> None:
+    """Set Up the DroneTest and the TestCase object for tests execution, and enforce Timeout"""
     try :
         with open(jfile, "r") as fp:
             data = json.load(fp)
@@ -96,6 +100,7 @@ def convert_and_run(jfile, port) -> None:
         out_path = os.path.join(par.YAML_DIR, f"{name}.yaml")
         tc.save_yaml(out_path)
 
+        # a little break to cool off
         sleep(par.COOL)
         p = mp.Process(target=run_test_in_process, args=(tc, name, obstacles))
         p.start()
@@ -114,6 +119,7 @@ def convert_and_run(jfile, port) -> None:
             print(f"[-] Failed deleting {jfile}: {e}")
 
 def process_forever():
+    """Process waits and prepare the json file for the tests build and execution"""
     logging.info(f"[+] middle.py daemon — polling every {par.POLL}s")
     PORT_POOL = list(range(CF_PORT, CF_PORT + par.MAX_WORKERS, 50))
 

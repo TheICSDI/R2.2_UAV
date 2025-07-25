@@ -4,10 +4,6 @@ import os
 import numpy as np
 import atexit
 import shutil
-# import pymap3d as pm
-from shapely.geometry import Polygon#, LineString
-from shapely import affinity
-# from shapely.ops import substring
 from pymoo.core.problem import Problem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
@@ -25,17 +21,12 @@ class UAVTestGenomeProblem(Problem):
 
     def _evaluate(self, X, out, *args, **kwargs):
 
-        def is_overlapping(obs1, obs2):
-            def poly(obs):
-                l, w = obs["size"][:2]
-                rect = Polygon([(-l/2,-w/2),(l/2,-w/2),(l/2,w/2),(-l/2,w/2)])
-                r = affinity.rotate(rect, obs["rotation"], origin=(0,0))
-                return affinity.translate(r, obs["position"][0], obs["position"][1])
-            return poly(obs1).intersects(poly(obs2))
-
-        names_in_order = []     # ensure population order = fitness order
-        pending_names = []     # only the ones we actually simulate
-        penalties = []     # rows with early-detected invalids
+        # ensure population order = fitness order
+        names_in_order = []
+        # only the ones we actually simulate
+        pending_names = []
+        # rows with early-detected invalids
+        penalties = []
         archive_traj = self.archive
 
         # generate genomes / basic checks
@@ -49,7 +40,7 @@ class UAVTestGenomeProblem(Problem):
             valid = len(obstacles) > 0
             for i in range(len(obstacles)):
                 for j in range(i + 1, len(obstacles)):
-                    if is_overlapping(obstacles[i], obstacles[j]):
+                    if utils.is_overlapping(obstacles[i], obstacles[j]):
                         valid = False
                         break
                 if not valid:

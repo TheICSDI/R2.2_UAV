@@ -13,9 +13,11 @@ FINAL_DIR = "./final_tests"
 DESTINATION_DIR = "/src/aerialist"
 HOST_DIR = "/src/aerialist/results/temp"
 CASE_STUDIES_DIR = f"{HOST_DIR}/case_studies"
-MIDDLE_PATH = f"{HOST_DIR}/middle.py" # check line below
-MIDDLE_PY = MIDDLE_PATH[:-9]
+MIDDLE_PY = "middle.py"
+MIDDLE_PATH = f"{HOST_DIR}/{MIDDLE_PY}"
 TESTCASE_PATH = f"{HOST_DIR}/testcase.py"
+UTILS_PATH = f"{HOST_DIR}/utils.py"
+PAR_PATH = f"{HOST_DIR}/parameters.py"
 
 # SBFT constraints
 NUM_OBS = 3
@@ -47,7 +49,7 @@ TLX_EPS_REL = np.array([
 ])
 
 # Evolution parameters
-POP_SIZE = 20
+POP_SIZE = 30
 N_GENERATIONS = 8
 SEED = 42
 
@@ -59,10 +61,9 @@ DOCKER_IMAGE    = "5ff51322acba"        # Aerialist image ID / tag
 CONTAINER_NAME  = "aerialist-middle"
 SHARED_HOST_DIR = "/mnt/c/UAV"
 SHARED_CONT_DIR = "/src/aerialist/results"
-COPY_SCRIPT     = "/temp/copy.sh"
 
 # tube radius
-PAD_M = 10.0
+PAD_M = 20.0
 
 # ----------------------------------------------------
 # Configuration of middle.py
@@ -72,14 +73,15 @@ YAML_DIR = f"{HOST_DIR}/generated_tests"
 RESULTS_DIR = f"{HOST_DIR}/results"
 BASE_YAML = "./case_studies/mission2.yaml"
 
-# both in second
+# second
 TIMEOUT = 20 * 60
-COOL = 5
+COOL = 10
 POLL = 60
 
+# # of concurrent test
 MAX_WORKERS = 1
 
 # ----------------------------------------------------
 # Configuration of utils.py
 
-TRIM_FRAC = 0.2
+TRIM_FRAC = 0.25

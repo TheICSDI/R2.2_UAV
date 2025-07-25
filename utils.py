@@ -7,8 +7,9 @@ import numpy as np
 from time import sleep, time
 from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
-from shapely.geometry import LineString
 from shapely.ops import substring
+from shapely.geometry import Polygon, LineString
+from shapely import affinity
 
 
 def start_middle_container():
@@ -19,22 +20,25 @@ def start_middle_container():
         "--gpus",     "all",
         "-v",         f"{par.SHARED_HOST_DIR}:{par.SHARED_CONT_DIR}",
         "-it",        par.DOCKER_IMAGE,
-        "bash", "-c", f"cp {par.CASE_STUDIES_DIR} {par.DESTINATION_DIR} \
-        && cp {par.MIDDLE_PATH} {par.DESTINATION_DIR} \
-        && cp {par.TESTCASE_PATH} {par.DESTINATION_DIR} \
-        && export PYTHONPATH={par.DESTINATION_DIR}:$PYTHONPATH \
-        && python3 {par.DESTINATION_DIR}/{par.MIDDLE_PY}"
+        "bash", "-c", f"cp {par.CASE_STUDIES_DIR} {par.DESTINATION_DIR} -r &&\
+        cp {par.MIDDLE_PATH} {par.DESTINATION_DIR} &&\
+        cp {par.TESTCASE_PATH} {par.DESTINATION_DIR} &&\
+        cp {par.UTILS_PATH} {par.DESTINATION_DIR} &&\
+        cp {par.PAR_PATH} {par.DESTINATION_DIR} &&\
+        python3 {par.DESTINATION_DIR}/{par.MIDDLE_PY}"
     ]
     print("[+] Starting middle.py in Docker container...")
     check_call(cmd)
     print(f"[+] Container '{par.CONTAINER_NAME}' started.")
 
 def stop_middle_container():
+    """Stop docker container"""
     print(f"[+] Stopping container '{par.CONTAINER_NAME}'...")
     call(["docker", "stop", par.CONTAINER_NAME])
     print("[+] Container stopped.")
 
 def genome_to_data_dict(genome, name_prefix="test"):
+    """Build obstacles and prepare the dict object for json"""
     name = f"{name_prefix}_{uuid4().hex[:8]}"
     obstacles = []
 
@@ -53,16 +57,17 @@ def genome_to_data_dict(genome, name_prefix="test"):
             }
             obstacles.append(obstacle)
 
-
     return {"name": name, "obstacles": obstacles}, name
 
 def save_genome_data(data_dict, name):
+    """Build the json with the date generated from genomes"""
     genome_path = path.join(par.OUTPUT_DIR, f"{name}.json")
     with open(genome_path, 'w') as f:
         json.dump(data_dict, f, indent=2)
     return genome_path
 
 def wait_for_all(names, results_dir, per_file_timeout=par.TIMEOUT + 60, poll=60):
+    """Waits that all generated tests are executed"""
     pending = set(names)
     collected = {}
     deadline = time() + per_file_timeout * len(names)
@@ -84,7 +89,17 @@ def wait_for_all(names, results_dir, per_file_timeout=par.TIMEOUT + 60, poll=60)
         collected[n] = None
     return collected
 
+def is_overlapping(obs1, obs2):
+    """Check if obstacle are overlapping"""
+    def poly(obs):
+        l, w = obs["size"][:2]
+        rect = Polygon([(-l/2,-w/2),(l/2,-w/2),(l/2,w/2),(-l/2,w/2)])
+        r = affinity.rotate(rect, obs["rotation"], origin=(0,0))
+        return affinity.translate(r, obs["position"][0], obs["position"][1])
+    return poly(obs1).intersects(poly(obs2))
+
 def downsample(traj, k = par.NOVELTY_DOWNSAMPLE_K):
+    """Approximate the trajectory"""
     if len(traj) <= k:
         return traj
 
@@ -108,11 +123,8 @@ def dtw_novelty(traj, archive):
         return 0
     return min(dtw_distance_xy(traj, ref) for ref in archive)
 
-PLAN_FILE = "/mnt/c/UAV/temp/case_studies/mission2.plan"
-# tube radius
-PAD_M = 10.0
-
 def ll_to_enu(lat, lon, lat0, lon0):
+    """Convert enu coordinates to relative one, using flat-earth method since route < 1 km"""
     # equatorial radius
     R = 6378137.0
     d_north = (lat - lat0) * np.pi/180 * R
@@ -120,6 +132,7 @@ def ll_to_enu(lat, lon, lat0, lon0):
     return d_north, d_east
 
 def load_route(plan_path: str):
+    """Load the enu coordinates from the mission.plan """
     # Usually just 16 (waypoint) 21 (land) 22 (takeoff)
     COMMANDS = [16, 17, 18, 19, 21, 22, 25, 31, 82, 84, 85]
     TRIM_FRAC = 0.2
