@@ -14,7 +14,7 @@ from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from pymoo.core.survival import Survival
 from pymoo.core.callback import Callback
-# from pymoo.core.sampling import Sampling
+from pymoo.core.sampling import Sampling
 
 class UAVTestGenomeProblem(Problem):
     def __init__(self):
@@ -150,24 +150,23 @@ class TolerantLexicoSurvival(Survival):
 
         return pop[order[:n_survive]]
 
-"""
 class PathSeedSampling(Sampling):
 
     def _do(self, problem, n_samples, **kwargs):
-        ROUTE = load_route(PLAN_FILE)
-        rng = np.random.default_rng(SEED)
+        ROUTE = utils.load_route(par.PLAN_FILE)
+        rng = np.random.default_rng(par.SEED)
 
         X = np.empty((n_samples, problem.n_var))
         for k in range(n_samples):
             genes = []
-            for obs in range(NUM_OBS):
+            for obs in range(par.NUM_OBS):
                 # pick a random point along the nominal track
                 s = rng.random()
                 base = ROUTE.interpolate(s, normalized=True)
 
                 # scatter inside a circle of pad-radius
                 angle = rng.uniform(0, 2*np.pi)
-                radius = rng.uniform(0, PAD_M)
+                radius = rng.uniform(0, par.PAD_M)
                 dx = radius * np.cos(angle)
                 dy = radius * np.sin(angle)
                 x = base.x + dx
@@ -182,7 +181,6 @@ class PathSeedSampling(Sampling):
 
             X[k] = genes
         return X
-"""
 
 class Diagnostics(Callback):
     def __init__(self, eps_abs: np.ndarray):

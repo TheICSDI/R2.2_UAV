@@ -7,6 +7,8 @@ import numpy as np
 from time import sleep, time
 from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
+from shapely.geometry import LineString
+from shapely.ops import substring
 
 
 def start_middle_container():
@@ -106,46 +108,41 @@ def dtw_novelty(traj, archive):
         return 0
     return min(dtw_distance_xy(traj, ref) for ref in archive)
 
-"""
 PLAN_FILE = "/mnt/c/UAV/temp/case_studies/mission2.plan"
 # tube radius
 PAD_M = 10.0
 
+def ll_to_enu(lat, lon, lat0, lon0):
+    # equatorial radius
+    R = 6378137.0
+    d_north = (lat - lat0) * np.pi/180 * R
+    d_east  = (lon - lon0) * np.pi/180 * R * np.cos(np.deg2rad(lat0))
+    return d_north, d_east
+
 def load_route(plan_path: str):
-    Parse a QGC .plan file and return the nominal 2-D path as a Shapely LineString
-    CUT = 0.20
+    # Usually just 16 (waypoint) 21 (land) 22 (takeoff)
+    COMMANDS = [16, 17, 18, 19, 21, 22, 25, 31, 82, 84, 85]
+    TRIM_FRAC = 0.2
+    # No command 82 found in the available tests but it shouldn't be treated like the other
 
     with open(plan_path, 'r') as fp:
         data = json.load(fp)
 
     mission = data["mission"]
-    items = mission["items"]
-    home_lat, home_lon, home_alt = mission["plannedHomePosition"]
 
-    def to_enu(lat, lon, alt):
-        e, n, _ = pm.geodetic2enu(lat, lon, alt,
-                                  home_lat, home_lon, home_alt)
-        # discard altitude because aerialist fa schifo
-        return (e, n)
-
-    waypoints_xy = []
-    for item in items:
-        try:
-            lat, lon, alt = item["params"][4:7]
-        except (KeyError, ValueError):
-            # Skips malformed entry
+    waypoints = []
+    for item in mission["items"]:
+        # this assumes that 22(16)^*21 as all the sample tests
+        if item["command"] not in COMMANDS:
             continue
 
-        if lat is None or lon is None:
-            continue
+        lat, lon = item["params"][4:6]
 
-        waypoints_xy.append(to_enu(lat, lon, alt))
+        waypoints.append((lat, lon))
+    waypoints = [ll_to_enu(lat, lon, waypoints[0][0], waypoints[0][1]) for lat, lon in waypoints]
 
-    if len(waypoints_xy) < 2:
-        raise ValueError("Plan file contains fewer than two geo way-points")
-
-    full_route = LineString(waypoints_xy)
-
-    tot = full_route.length
-    return substring(full_route, CUT*tot, (1-CUT)*tot)
-"""
+    full_route = LineString(waypoints)
+    tot_len = full_route.length
+    start_d = TRIM_FRAC * tot_len
+    end_d   = (1.0 - TRIM_FRAC) * tot_len
+    return substring(full_route, start_d, end_d)

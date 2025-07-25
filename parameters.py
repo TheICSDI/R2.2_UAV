@@ -4,9 +4,11 @@ import numpy as np
 # Configuration of start.py
 
 # Paths
-OUTPUT_DIR = "/mnt/c/UAV/temp/generated_genomes"
-RESULTS_DIR = "/mnt/c/UAV/temp/results"
-YAML_DIR = "/mnt/c/UAV/temp/generated_tests"
+BASE_DIR = "/mnt/c/UAV/temp/"
+OUTPUT_DIR = f"{BASE_DIR}/generated_genomes"
+RESULTS_DIR = f"{BASE_DIR}/results"
+YAML_DIR = f"{BASE_DIR}/generated_tests"
+PLAN_FILE = f"{BASE_DIR}/case_studies/mission2.plan"
 FINAL_DIR = "./final_tests"
 DESTINATION_DIR = "/src/aerialist"
 HOST_DIR = "/src/aerialist/results/temp"
@@ -59,7 +61,6 @@ SHARED_HOST_DIR = "/mnt/c/UAV"
 SHARED_CONT_DIR = "/src/aerialist/results"
 COPY_SCRIPT     = "/temp/copy.sh"
 
-PLAN_FILE = "/mnt/c/UAV/temp/case_studies/mission2.plan"
 # tube radius
 PAD_M = 10.0
 
@@ -77,3 +78,8 @@ COOL = 5
 POLL = 60
 
 MAX_WORKERS = 1
+
+# ----------------------------------------------------
+# Configuration of utils.py
+
+TRIM_FRAC = 0.2
