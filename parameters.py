@@ -4,7 +4,7 @@ import numpy as np
 # Configuration of start.py
 
 # Paths
-BASE_DIR = "/mnt/c/UAV/temp/"
+BASE_DIR = ""
 OUTPUT_DIR = f"{BASE_DIR}/generated_genomes"
 RESULTS_DIR = f"{BASE_DIR}/results"
 YAML_DIR = f"{BASE_DIR}/generated_tests"
@@ -57,7 +57,7 @@ SEED = 42
 TOP_K = 15
 
 # DOCKER
-DOCKER_IMAGE    = "5ff51322acba"        # Aerialist image ID / tag
+DOCKER_IMAGE    = ""        # Aerialist image ID / tag
 CONTAINER_NAME  = "aerialist-middle"
 SHARED_HOST_DIR = "/mnt/c/UAV"
 SHARED_CONT_DIR = "/src/aerialist/results"
