@@ -59,11 +59,8 @@ TOP_K = 15
 # DOCKER
 DOCKER_IMAGE    = ""        # Aerialist image ID / tag
 CONTAINER_NAME  = "aerialist-middle"
-SHARED_HOST_DIR = "/mnt/c/UAV"
+SHARED_HOST_DIR = BASE_DIR
 SHARED_CONT_DIR = "/src/aerialist/results"
-
-# tube radius
-PAD_M = 20.0
 
 # ----------------------------------------------------
 # Configuration of middle.py
@@ -77,11 +74,3 @@ BASE_YAML = "./case_studies/mission2.yaml"
 TIMEOUT = 20 * 60
 COOL = 10
 POLL = 60
-
-# # of concurrent test
-MAX_WORKERS = 1
-
-# ----------------------------------------------------
-# Configuration of utils.py
-
-TRIM_FRAC = 0.25

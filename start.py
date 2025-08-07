@@ -10,7 +10,6 @@ from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from pymoo.core.survival import Survival
 from pymoo.core.callback import Callback
-from pymoo.core.sampling import Sampling
 
 class UAVTestGenomeProblem(Problem):
     def __init__(self):
@@ -141,38 +140,6 @@ class TolerantLexicoSurvival(Survival):
 
         return pop[order[:n_survive]]
 
-class PathSeedSampling(Sampling):
-
-    def _do(self, problem, n_samples, **kwargs):
-        ROUTE = utils.load_route(par.PLAN_FILE)
-        rng = np.random.default_rng(par.SEED)
-
-        X = np.empty((n_samples, problem.n_var))
-        for k in range(n_samples):
-            genes = []
-            for obs in range(par.NUM_OBS):
-                # pick a random point along the nominal track
-                s = rng.random()
-                base = ROUTE.interpolate(s, normalized=True)
-
-                # scatter inside a circle of pad-radius
-                angle = rng.uniform(0, 2*np.pi)
-                radius = rng.uniform(0, par.PAD_M)
-                dx = radius * np.cos(angle)
-                dy = radius * np.sin(angle)
-                x = base.x + dx
-                y = base.y + dy
-
-                # sample size / rotation within bounds
-                l = rng.uniform(problem.xl[2], problem.xu[2])
-                w = rng.uniform(problem.xl[3], problem.xu[3])
-                h = rng.uniform(max(10., problem.xl[4]), problem.xu[4])
-                r = rng.uniform(problem.xl[5], problem.xu[5])
-                genes.extend([x, y, l, w, h, r])
-
-            X[k] = genes
-        return X
-
 class Diagnostics(Callback):
     def __init__(self, eps_abs: np.ndarray):
         super().__init__()
@@ -240,7 +207,7 @@ if __name__ == "__main__":
     problem = UAVTestGenomeProblem()
     survival = TolerantLexicoSurvival(par.TLX_EPS_ABS, par.TLX_EPS_REL)
     diagnostics = Diagnostics(par.TLX_EPS_ABS)
-    algorithm = NSGA2(pop_size=par.POP_SIZE, survival=survival, eliminate_duplicates=True, sampling=PathSeedSampling())
+    algorithm = NSGA2(pop_size=par.POP_SIZE, survival=survival, eliminate_duplicates=True)
     algorithm.survival = survival
     termination = get_termination("n_gen", par.N_GENERATIONS)
 
