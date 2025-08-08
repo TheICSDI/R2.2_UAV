@@ -34,7 +34,7 @@ The path of the shared folder can be found in `parameters.py`
 
 1. Pull the official image:
 ```bash
-docker pull ghcr.io/skhatiri/aerialist:latest
+docker pull skhatiri/aerialist
 ```
     
 2. Update `parameters.py`
